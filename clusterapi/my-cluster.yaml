@@ -1,0 +1,144 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: example
+spec: {}
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: my-cluster
+  namespace: example
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+      - 192.168.0.0/16
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+    kind: AWSManagedControlPlane
+    name: my-cluster-control-plane
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+    kind: AWSManagedCluster
+    name: my-cluster
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSManagedCluster
+metadata:
+  name: my-cluster
+  namespace: example
+spec: {}
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+kind: AWSManagedControlPlane
+metadata:
+  name: my-cluster-control-plane
+  namespace: example
+spec:
+  eksClusterName: my-cluster
+  region: ap-northeast-1
+  sshKeyName: default
+  version: v1.28.0
+network:
+  cni:
+    cniIngressRules:
+    - description: bgp (calico)
+      fromPort: 179
+      protocol: tcp
+      toPort: 179
+    - description: IP-in-IP (calico)
+      fromPort: -1
+      protocol: "4"
+      toPort: 65535
+  subnets:
+  - availabilityZone: ap-northeast-1a
+    cidrBlock: 10.0.0.0/20
+    id: my-cluster-subnet-public-ap-northeast-1a
+    isPublic: true
+    resourceID: subnet-06f231141d23d56f8
+    tags:
+      Name: my-cluster-subnet-public-ap-northeast-1a
+  - availabilityZone: ap-northeast-1c
+    cidrBlock: 10.0.16.0/20
+    id: my-cluster-subnet-public-ap-northeast-1c
+    isPublic: true
+    resourceID: subnet-0a02815a709744887
+    tags:
+      Name: my-cluster-subnet-public-ap-northeast-1c
+  - availabilityZone: ap-northeast-1c
+    cidrBlock: 10.0.128.0/18
+    id: my-cluster-subnet-private-ap-northeast-1c
+    isPublic: false
+    resourceID: subnet-0e451e84a1cd61bec
+    tags:
+      Name: my-cluster-subnet-private-ap-northeast-1c
+  - availabilityZone: ap-northeast-1d
+    cidrBlock: 10.0.192.0/18
+    id: my-cluster-subnet-private-ap-northeast-1d
+    isPublic: false
+    resourceID: subnet-0a2d3ace41abebe70
+    tags:
+      Name: my-cluster-subnet-private-ap-northeast-1d
+  vpc:
+    availabilityZoneSelection: Ordered
+    availabilityZoneUsageLimit: 3
+    cidrBlock: 10.0.0.0/16
+    id: vpc-0fdb5d584d702cefa
+    internetGatewayId: igw-06c51ff543bffe7cc
+    tags:
+      Name: my-cluster-vpc
+      sigs.k8s.io/cluster-api-provider-aws/cluster/my-cluster: owned
+      sigs.k8s.io/cluster-api-provider-aws/role: common
+  addons:
+    - name: "vpc-cni"
+      version: "v1.16.0-eksbuild.1"
+      conflictResolution: "overwrite"
+    - name: "coredns"
+      version: "v1.10.1-eksbuild.6"
+      conflictResolution: "overwrite"
+    - name: "kube-proxy"
+      version: "v1.28.4-eksbuild.4"
+      conflictResolution: "overwrite"
+    # - name: "ebs-csi-driver"
+    #   version: "v1.26.1-eksbuild.1"
+    #   conflictResolution: "overwrite"
+    # - name: "pod-identity-agent"
+    #   version: "v1.0.0-eksbuild.1"
+    #   conflictResolution: "overwrite"
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachinePool
+metadata:
+  name: my-cluster-pool-0
+  namespace: example
+spec:
+  clusterName: my-cluster
+  replicas: 1
+  template:
+    spec:
+      bootstrap:
+        dataSecretName: my-cluster-kubeconfig
+      clusterName: my-cluster
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+        kind: AWSManagedMachinePool
+        name: my-cluster-pool-0
+      version: v1.28.0
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSManagedMachinePool
+metadata:
+  name: my-cluster-pool-0
+  namespace: example
+spec: 
+  roleName: eks-nodegroup
+  amiType: AL2_x86_64
+  instanceType: t3.large
+  diskSize: 10
+  availabilityZones:
+  - ap-northeast-1a
+  - ap-northeast-1c
+  scaling:
+    maxSize: 2
+    minSize: 1
